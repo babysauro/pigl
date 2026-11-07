@@ -1,0 +1,1280 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#120d2b">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Per te</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Quicksand:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  /* ============================================================
+     STILE – palette notte/sakura (la stessa del ramo in Canvas 2D)
+     ============================================================ */
+  :root {
+    --notte: #120d2b;
+    --rosa: #ffc6d9;
+    --rosa-forte: #ff8fb3;
+    --testo: #fff4f8;
+    --safe-t: env(safe-area-inset-top, 0px);
+    --safe-b: env(safe-area-inset-bottom, 0px);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: var(--notte); overscroll-behavior: none; }
+  body {
+    position: fixed; inset: 0;
+    touch-action: none;                 /* niente zoom con doppio tocco o pinch */
+    -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
+    font-family: 'Quicksand', system-ui, -apple-system, sans-serif;
+    color: var(--testo);
+  }
+  #scena { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+  #confetti { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 30; }
+
+  /* Velo iniziale: dissolvenza in apertura */
+  #velo { position: fixed; inset: 0; background: var(--notte); z-index: 50; pointer-events: none; transition: opacity 2.6s ease; }
+  #velo.via { opacity: 0; }
+
+  /* Frase poetica (apertura e "ricordi" a ogni tocco) */
+  #ricordo {
+    position: fixed; left: 50%; top: calc(11vh + var(--safe-t)); transform: translateX(-50%);
+    width: min(86vw, 480px); text-align: center; z-index: 10; pointer-events: none;
+    font-family: 'Cormorant Garamond', Georgia, serif; font-style: italic; font-weight: 500;
+    font-size: clamp(23px, 6.6vw, 34px); line-height: 1.22; color: #fff;
+    text-shadow: 0 0 26px rgba(255, 150, 195, .6), 0 2px 16px rgba(18, 8, 40, .9);
+    opacity: 0; visibility: hidden;
+  }
+
+  /* Indicatore di progresso: anello di luce + invito */
+  #progresso {
+    position: fixed; left: 50%; bottom: calc(26px + var(--safe-b)); transform: translateX(-50%);
+    width: min(88vw, 420px); display: flex; flex-direction: column; align-items: center; gap: 12px;
+    text-align: center; z-index: 10; pointer-events: none; opacity: 0; visibility: hidden;
+  }
+  .anello { position: relative; width: 62px; height: 62px; }
+  .anello svg { width: 100%; height: 100%; transform: rotate(-90deg); overflow: visible; }
+  .anello .base { fill: none; stroke: rgba(255, 220, 235, .15); stroke-width: 1.6; }
+  .anello .luce {
+    fill: none; stroke: url(#gradAnello); stroke-width: 2.4; stroke-linecap: round;
+    filter: drop-shadow(0 0 5px rgba(255, 160, 200, .95));
+    transition: stroke-dashoffset 1.2s cubic-bezier(.22, 1, .36, 1);
+  }
+  .anello .perc {
+    position: absolute; inset: 0; display: grid; place-items: center;
+    font-family: 'Cormorant Garamond', Georgia, serif; font-size: 17px; font-weight: 500;
+    letter-spacing: .04em; color: var(--rosa);
+  }
+  .invito {
+    font-family: 'Cormorant Garamond', Georgia, serif; font-style: italic;
+    font-size: clamp(17px, 4.7vw, 21px); line-height: 1.35; color: rgba(255, 240, 246, .9);
+    text-shadow: 0 2px 18px rgba(18, 8, 40, .85);
+    animation: respiroTesto 3.4s ease-in-out infinite;
+  }
+  @keyframes respiroTesto { 0%, 100% { opacity: .65; } 50% { opacity: 1; } }
+
+  /* Onda di luce nel punto toccato */
+  .onda {
+    position: fixed; width: 84px; height: 84px; margin: -42px 0 0 -42px; border-radius: 50%;
+    border: 1px solid rgba(255, 214, 230, .85); pointer-events: none; z-index: 6;
+    box-shadow: 0 0 18px rgba(255, 150, 195, .6), inset 0 0 14px rgba(255, 180, 210, .45);
+    animation: onda .95s cubic-bezier(.2, .8, .3, 1) forwards;
+  }
+  @keyframes onda { from { transform: scale(.15); opacity: 1; } to { transform: scale(1.7); opacity: 0; } }
+
+  /* ---------- Card finale in vetro sfocato ---------- */
+  #card-wrap {
+    position: fixed; inset: 0; z-index: 20; pointer-events: none;
+    display: grid; place-items: center;
+    padding: calc(20px + var(--safe-t)) 18px calc(20px + var(--safe-b));
+  }
+  .card {
+    position: relative; overflow: hidden; pointer-events: auto;
+    width: min(100%, 410px); padding: 40px 28px 32px; border-radius: 30px; text-align: center;
+    background: linear-gradient(160deg, rgba(255, 255, 255, .16), rgba(70, 28, 92, .32) 55%, rgba(40, 16, 70, .42));
+    border: 1px solid rgba(255, 230, 240, .3);
+    -webkit-backdrop-filter: blur(18px) saturate(150%); backdrop-filter: blur(18px) saturate(150%);
+    box-shadow: 0 30px 80px rgba(10, 4, 30, .55), inset 0 1px 0 rgba(255, 255, 255, .3);
+    opacity: 0; visibility: hidden;
+  }
+  .card::before {                       /* riflesso di luce che attraversa il vetro */
+    content: ''; position: absolute; inset: -40%; pointer-events: none;
+    background: linear-gradient(115deg, transparent 42%, rgba(255, 255, 255, .13) 50%, transparent 58%);
+    animation: riflesso 7s ease-in-out infinite;
+  }
+  @keyframes riflesso { 0%, 100% { transform: translateX(-30%); } 50% { transform: translateX(30%); } }
+  .fase { position: relative; }
+  .ornamento { width: 38px; height: 38px; margin: 0 auto 18px; animation: gira 18s linear infinite; }
+  @keyframes gira { to { transform: rotate(360deg); } }
+  .messaggio {
+    font-family: 'Cormorant Garamond', Georgia, serif; font-style: italic;
+    font-size: clamp(18px, 4.9vw, 21px); line-height: 1.5; color: rgba(255, 242, 248, .92);
+  }
+  .domanda {
+    margin-top: 22px; font-family: 'Cormorant Garamond', Georgia, serif; font-weight: 600;
+    font-size: clamp(27px, 7.6vw, 34px); line-height: 1.18; color: #fff;
+    text-shadow: 0 0 28px rgba(255, 150, 195, .55);
+  }
+  #si {
+    position: relative; overflow: hidden; margin-top: 30px; width: 100%;
+    padding: 19px 26px; border: 0; border-radius: 999px; cursor: pointer;
+    font-family: 'Cormorant Garamond', Georgia, serif; font-size: clamp(23px, 6.4vw, 27px);
+    font-weight: 600; letter-spacing: .03em; color: #fff;
+    background: linear-gradient(135deg, #ffa3c4 0%, #f0609a 48%, #b84fc0 100%);
+    box-shadow: 0 12px 32px rgba(240, 96, 154, .5), inset 0 1px 0 rgba(255, 255, 255, .45);
+    touch-action: manipulation;
+    animation: battitoBottone 2.4s ease-in-out infinite;
+  }
+  #si::before {                         /* alone che pulsa intorno al pulsante */
+    content: ''; position: absolute; inset: 0; border-radius: inherit;
+    box-shadow: 0 0 0 0 rgba(255, 170, 205, .7); animation: aloneBottone 2.4s ease-out infinite;
+  }
+  #si::after {                          /* scintillio che scorre */
+    content: ''; position: absolute; top: 0; left: -70%; width: 45%; height: 100%;
+    background: linear-gradient(100deg, transparent, rgba(255, 255, 255, .6), transparent);
+    transform: skewX(-20deg); animation: luccichio 3.4s ease-in-out infinite;
+  }
+  #si:active { transform: scale(.97); }
+  #si:focus-visible { outline: 2px solid #fff; outline-offset: 4px; }
+  @keyframes battitoBottone { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.025); } }
+  @keyframes aloneBottone { 0% { box-shadow: 0 0 0 0 rgba(255, 170, 205, .6); } 70%, 100% { box-shadow: 0 0 0 16px rgba(255, 170, 205, 0); } }
+  /* Bottone "No": scappa quando lo tocchi e alla fine sparisce */
+  #no {
+    position: relative; z-index: 2; margin-top: 14px; padding: 10px 30px;
+    border: 1px solid rgba(255, 230, 240, .4); border-radius: 999px; cursor: pointer;
+    font-family: 'Quicksand', sans-serif; font-size: 16px; letter-spacing: .08em; color: rgba(255, 242, 248, .85);
+    background: rgba(255, 255, 255, .08);
+    -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+    touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+  }
+  #no:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
+  @keyframes luccichio { 0%, 55% { left: -70%; } 100% { left: 130%; } }
+
+  /* Fase finale: cuore animato */
+  .cuore { position: relative; width: 92px; height: 92px; margin: 0 auto 20px; }
+  .cuore svg { position: relative; width: 100%; height: 100%; animation: battito 1.25s ease-in-out infinite; filter: drop-shadow(0 0 18px rgba(255, 110, 165, .85)); }
+  .cuore::before, .cuore::after {
+    content: ''; position: absolute; inset: 8%; border-radius: 50%;
+    border: 1.5px solid rgba(255, 170, 205, .7); animation: anelloCuore 2.5s ease-out infinite;
+  }
+  .cuore::after { animation-delay: 1.25s; }
+  @keyframes battito { 0%, 100% { transform: scale(1); } 14% { transform: scale(1.16); } 28% { transform: scale(1); } 42% { transform: scale(1.1); } 70% { transform: scale(1); } }
+  @keyframes anelloCuore { from { transform: scale(.6); opacity: 1; } to { transform: scale(1.9); opacity: 0; } }
+  .titolo-finale {
+    font-family: 'Cormorant Garamond', Georgia, serif; font-weight: 600;
+    font-size: clamp(30px, 8.4vw, 38px); line-height: 1.15; color: #fff;
+    text-shadow: 0 0 30px rgba(255, 150, 195, .6);
+  }
+  .testo-finale {
+    margin-top: 16px; font-family: 'Cormorant Garamond', Georgia, serif; font-style: italic;
+    font-size: clamp(18px, 5vw, 21px); line-height: 1.5; color: rgba(255, 242, 248, .92);
+  }
+  .firma { margin-top: 20px; font-family: 'Quicksand', sans-serif; font-size: 15px; letter-spacing: .18em; text-transform: uppercase; color: var(--rosa); }
+
+  /* Messaggio se le librerie non si caricano (es. senza Internet) */
+  #errore {
+    position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 32px; text-align: center;
+    background: radial-gradient(circle at 50% 35%, #4a2f5e, var(--notte) 70%);
+    font-family: 'Cormorant Garamond', Georgia, serif; font-style: italic; font-size: 22px; line-height: 1.5;
+  }
+  #errore[hidden] { display: none; }
+  #errore button {
+    margin-top: 22px; padding: 12px 28px; border: 1px solid rgba(255, 230, 240, .5); border-radius: 999px;
+    background: rgba(255, 255, 255, .1); color: #fff; font: inherit; font-style: normal; font-size: 18px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .invito, .ornamento, #si, #si::before, #si::after, .card::before { animation: none; }
+  }
+</style>
+</head>
+<body>
+
+<canvas id="scena" aria-label="Un ciliegio in fiore sotto un cielo stellato. Tocca lo schermo per farlo fiorire."></canvas>
+<canvas id="confetti"></canvas>
+
+<div id="ricordo" aria-live="polite"></div>
+
+<div id="progresso">
+  <div class="anello">
+    <svg viewBox="0 0 64 64" aria-hidden="true">
+      <defs>
+        <linearGradient id="gradAnello" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#ffe3ee"/>
+          <stop offset="1" stop-color="#ff7fb0"/>
+        </linearGradient>
+      </defs>
+      <circle class="base" cx="32" cy="32" r="28"/>
+      <circle class="luce" cx="32" cy="32" r="28"/>
+    </svg>
+    <span class="perc">0%</span>
+  </div>
+  <p class="invito"></p>
+</div>
+
+<div id="card-wrap">
+  <section class="card" role="dialog" aria-modal="true" aria-labelledby="domanda">
+    <div class="fase fase-domanda">
+      <svg class="ornamento riga" viewBox="-12 -12 24 24" aria-hidden="true">
+        <g fill="#ffc6d9">
+          <ellipse cy="-5.6" rx="3.3" ry="5.4"/>
+          <ellipse cy="-5.6" rx="3.3" ry="5.4" transform="rotate(72)"/>
+          <ellipse cy="-5.6" rx="3.3" ry="5.4" transform="rotate(144)"/>
+          <ellipse cy="-5.6" rx="3.3" ry="5.4" transform="rotate(216)"/>
+          <ellipse cy="-5.6" rx="3.3" ry="5.4" transform="rotate(288)"/>
+        </g>
+        <circle r="2.4" fill="#ffd27a"/>
+      </svg>
+      <p class="messaggio riga"></p>
+      <h1 class="domanda riga" id="domanda"></h1>
+      <button id="si" class="riga" type="button"></button>
+      <button id="no" class="riga" type="button"></button>
+    </div>
+    <div class="fase fase-finale" hidden>
+      <div class="cuore">
+        <svg viewBox="0 0 32 29" aria-hidden="true">
+          <defs>
+            <linearGradient id="gradCuore" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stop-color="#ffc2d8"/>
+              <stop offset="1" stop-color="#ec4a88"/>
+            </linearGradient>
+          </defs>
+          <path fill="url(#gradCuore)" d="M16 28.5S1.5 19.6 1.5 9.6C1.5 4.9 5 1.5 9.3 1.5c2.9 0 5.3 1.6 6.7 4 1.4-2.4 3.8-4 6.7-4 4.3 0 7.8 3.4 7.8 8.1 0 10-14.5 18.9-14.5 18.9z"/>
+        </svg>
+      </div>
+      <h2 class="titolo-finale"></h2>
+      <p class="testo-finale"></p>
+      <p class="firma"></p>
+    </div>
+  </section>
+</div>
+
+<div id="errore" hidden>
+  <div>
+    Per far sbocciare questa sorpresa serve una connessione a Internet.<br>Riprova tra un attimo ♡
+    <br><button type="button" onclick="location.reload()">Riprova</button>
+  </div>
+</div>
+
+<div id="velo"></div>
+
+<!-- Librerie (versioni fissate) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
+
+<script>
+(function () {
+'use strict';
+
+/* ============================================================
+   1. TESTI – modifica liberamente queste frasi
+   ============================================================ */
+const TESTI = {
+  apertura: 'Questo piccolo giardino è nato per te',
+  invito: 'Tocca lo schermo.',
+  // Una frase per ogni tocco (in ordine). Se i tocchi sono di più, si ricomincia dalla prima.
+  ricordi: [
+    '"Sei simpatica, voglio il tuo Instagram"',
+    '"AZZ NEGLI AMICI STRETTI"',
+    '"Conosciamo il soggetto in questione"',
+    '"Ma va tu pigl"',
+    '"Ho bubolo tra le tette"',
+    'Le "notti" a parlare di tutto',
+    'Ogni volta che mi hai capito senza parole',
+    'I sogni che abbiamo iniziato a condividere',
+    'La casa che stai diventando per me',
+    'E tutto quello che ancora ci aspetta…',
+  ],
+  messaggio: 'Ogni fiore di questo albero è un istante vissuto con te. Sei la primavera che arriva anche d’inverno, la casa che porto ovunque io vada.',
+  domanda: 'Vuoi essere SERENAMENTE la MIA FIANSATA? 💍',
+  bottone: 'Ovvio, ma che domande sono SISI?',
+  bottoneNo: 'No',
+  // testo del bottone "No" dopo ogni fuga (uno per fuga; l'ultimo si vede mentre sparisce)
+  frasiNo: ['OH', 'EH', 'UE', 'SISI C AMMA FA', 'NENNA'],
+  titoloFinale: 'Chiaretta può suonare le campane adesso',
+  testoFinale: 'I ll be comin for your love, okay - Take on me',
+  firma: 'Ti amo polpettina di melanzane con patate al forno e un poco di rosmarino! ♡',
+};
+
+/* ============================================================
+   2. IMPOSTAZIONI
+   ============================================================ */
+const IMPOSTAZIONI = {
+  tocchiNecessari: 10,     // tocchi per arrivare al 100% della fioritura
+  fiorituraIniziale: 0.12, // quota di fiori già aperti all'inizio (0–1)
+  semeAlbero: 20260214,    // cambia il numero per un albero con una forma diversa
+  fugheNo: 5,              // quante volte il bottone "No" scappa prima di sparire
+};
+
+const $ = s => document.querySelector(s);
+
+/* Se le librerie non sono arrivate (niente rete), mostra un messaggio gentile */
+if (!window.THREE || !window.gsap) {
+  $('#errore').hidden = false;
+  $('#velo').classList.add('via');
+  return;
+}
+
+/* Testi nella pagina */
+$('.invito').textContent = TESTI.invito;
+$('.messaggio').textContent = TESTI.messaggio;
+$('.domanda').textContent = TESTI.domanda;
+$('#si').textContent = TESTI.bottone;
+$('#no').textContent = TESTI.bottoneNo;
+$('.titolo-finale').textContent = TESTI.titoloFinale;
+$('.testo-finale').textContent = TESTI.testoFinale;
+$('.firma').textContent = TESTI.firma;
+
+/* ============================================================
+   3. QUALITÀ ADATTIVA (smartphone vs desktop)
+   ============================================================ */
+const isMobile = matchMedia('(pointer: coarse)').matches || Math.min(innerWidth, innerHeight) < 600;
+const riduciMovimento = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const Q = {
+  fiori:     isMobile ? 1100 : 1800,
+  petali:    isMobile ? 1300 : 2400,   // particelle massime contemporanee
+  nuvole:    isMobile ? 240  : 420,    // "vapore" rosa che dà volume alla chioma
+  stelle:    isMobile ? 650  : 1200,
+  lucciole:  isMobile ? 26   : 44,
+  suolo:     isMobile ? 260  : 420,    // petali caduti a terra
+  profondita: 6,                       // livelli di ramificazione
+  segmenti:  isMobile ? 6 : 8,
+};
+const PR = Math.min(window.devicePixelRatio || 1, isMobile ? 1.75 : 2);
+
+/* Numeri casuali: "seme" fisso per l'albero (sempre bello uguale), Math.random per le particelle */
+function mulberry32(a) {
+  return function () {
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+const seme = mulberry32(IMPOSTAZIONI.semeAlbero);
+const rs = (a, b) => a + seme() * (b - a);          // casuale "con seme"
+const rand = (a, b) => a + Math.random() * (b - a); // casuale libero
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+
+/* ============================================================
+   4. RENDERER, SCENA, CAMERA
+   ============================================================ */
+const canvas = $('#scena');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+renderer.setPixelRatio(PR);
+renderer.setSize(innerWidth, innerHeight);
+renderer.setClearColor(0x120d2b, 1);
+
+const scena = new THREE.Scene();
+scena.fog = new THREE.FogExp2(0x3d2552, 0.03);      // nebbia viola che dà profondità
+
+const camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.1, 240);
+
+/* ---------- Texture disegnate al volo (nessun file esterno) ---------- */
+function texturePetalo() {            // stesso petalo del ramo in Canvas 2D
+  const c = document.createElement('canvas');
+  c.width = c.height = 128;
+  const p = c.getContext('2d');
+  p.translate(64, 116);
+  const r = 100;
+  p.beginPath();
+  p.moveTo(0, 0);
+  p.bezierCurveTo(r * .9, -r * .2, r * .8, -r, r * .15, -r * 1.05);
+  p.lineTo(0, -r * .92);              // piccola incisione sulla punta
+  p.lineTo(-r * .15, -r * 1.05);
+  p.bezierCurveTo(-r * .8, -r, -r * .9, -r * .2, 0, 0);
+  const g = p.createLinearGradient(0, 0, 0, -r);
+  g.addColorStop(0, '#e9739b');
+  g.addColorStop(.35, '#fbc9d9');
+  g.addColorStop(1, '#fff1f5');
+  p.fillStyle = g;
+  p.fill();
+  return new THREE.CanvasTexture(c);
+}
+function textureMorbida() {           // macchia di luce sfumata
+  const c = document.createElement('canvas');
+  c.width = c.height = 64;
+  const p = c.getContext('2d');
+  const g = p.createRadialGradient(32, 32, 0, 32, 32, 32);
+  g.addColorStop(0, 'rgba(255,255,255,1)');
+  g.addColorStop(.3, 'rgba(255,255,255,.55)');
+  g.addColorStop(1, 'rgba(255,255,255,0)');
+  p.fillStyle = g;
+  p.fillRect(0, 0, 64, 64);
+  return new THREE.CanvasTexture(c);
+}
+function textureLuna() {
+  const c = document.createElement('canvas');
+  c.width = c.height = 256;
+  const p = c.getContext('2d');
+  const alone = p.createRadialGradient(128, 128, 18, 128, 128, 128);
+  alone.addColorStop(0, 'rgba(255,236,226,.55)');
+  alone.addColorStop(.35, 'rgba(255,200,220,.16)');
+  alone.addColorStop(1, 'rgba(255,200,220,0)');
+  p.fillStyle = alone;
+  p.fillRect(0, 0, 256, 256);
+  const disco = p.createRadialGradient(122, 122, 2, 128, 128, 24);
+  disco.addColorStop(0, '#fffaf2');
+  disco.addColorStop(1, '#ffe6da');
+  p.fillStyle = disco;
+  p.beginPath(); p.arc(128, 128, 22, 0, Math.PI * 2); p.fill();
+  return new THREE.CanvasTexture(c);
+}
+const texPetalo = texturePetalo();
+const texMorbida = textureMorbida();
+
+/* ============================================================
+   5. CIELO CREPUSCOLARE, STELLE, LUNA
+   ============================================================ */
+const cielo = new THREE.Mesh(
+  new THREE.SphereGeometry(110, 32, 16),
+  new THREE.ShaderMaterial({
+    side: THREE.BackSide, depthWrite: false, fog: false,
+    uniforms: {
+      cAlto:     { value: new THREE.Color(0x0b0822) },
+      cMezzo:    { value: new THREE.Color(0x3d2552) },
+      cBagliore: { value: new THREE.Color(0xe98fb0) },
+      cBasso:    { value: new THREE.Color(0x1a1030) },
+    },
+    vertexShader: `
+      varying vec3 vDir;
+      void main() {
+        vDir = normalize(position);
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }`,
+    fragmentShader: `
+      uniform vec3 cAlto, cMezzo, cBagliore, cBasso;
+      varying vec3 vDir;
+      void main() {
+        float h = vDir.y;
+        vec3 c = mix(cMezzo, cAlto, smoothstep(0.0, 0.6, h));
+        c = mix(c, cBasso, smoothstep(0.0, -0.25, h));
+        c += cBagliore * 0.34 * exp(-abs(h - 0.02) * 9.0);      // bagliore rosa all'orizzonte
+        c += vec3(0.32, 0.14, 0.4) * 0.22 * smoothstep(0.55, 0.05, h) * step(0.0, h);
+        gl_FragColor = vec4(c, 1.0);
+      }`,
+  })
+);
+cielo.renderOrder = -3;
+scena.add(cielo);
+
+/* Stelle che scintillano (shader: ognuna ha la sua fase) */
+const matStelle = new THREE.ShaderMaterial({
+  transparent: true, depthWrite: false, fog: false, blending: THREE.AdditiveBlending,
+  uniforms: { uTempo: { value: 0 }, uPR: { value: PR } },
+  vertexShader: `
+    attribute float aFase;
+    attribute float aDim;
+    uniform float uTempo, uPR;
+    varying float vA;
+    void main() {
+      vec4 mv = modelViewMatrix * vec4(position, 1.0);
+      gl_Position = projectionMatrix * mv;
+      float h = normalize(position).y;
+      vA = (0.5 + 0.5 * sin(uTempo * (0.7 + aFase * 0.25) + aFase * 7.0)) * smoothstep(0.03, 0.3, h);
+      gl_PointSize = aDim * uPR;
+    }`,
+  fragmentShader: `
+    varying float vA;
+    void main() {
+      float d = length(gl_PointCoord - 0.5);
+      float a = smoothstep(0.5, 0.0, d);
+      gl_FragColor = vec4(1.0, 0.94, 0.97, a * vA);
+    }`,
+});
+{
+  const n = Q.stelle;
+  const pos = new Float32Array(n * 3), fase = new Float32Array(n), dim = new Float32Array(n);
+  const v = new THREE.Vector3();
+  for (let i = 0; i < n; i++) {
+    do { v.set(rand(-1, 1), rand(0.04, 1), rand(-1, 1)); } while (v.lengthSq() > 1 || v.lengthSq() < 0.05);
+    v.normalize().multiplyScalar(100);
+    pos.set([v.x, v.y, v.z], i * 3);
+    fase[i] = rand(0, 6.28);
+    dim[i] = Math.random() < 0.08 ? rand(3, 4.2) : rand(1.2, 2.6);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  g.setAttribute('aFase', new THREE.BufferAttribute(fase, 1));
+  g.setAttribute('aDim', new THREE.BufferAttribute(dim, 1));
+  const stelle = new THREE.Points(g, matStelle);
+  stelle.renderOrder = -2;
+  stelle.frustumCulled = false;
+  scena.add(stelle);
+}
+
+const luna = new THREE.Sprite(new THREE.SpriteMaterial({ map: textureLuna(), fog: false, depthWrite: false, transparent: true }));
+luna.position.set(-13, 29, -86);
+luna.scale.set(30, 30, 1);
+luna.renderOrder = -1;
+scena.add(luna);
+
+/* ============================================================
+   6. LUCI (toni rosa e viola caldi)
+   ============================================================ */
+scena.add(new THREE.HemisphereLight(0xc4a8ff, 0x2a1530, 0.85));
+scena.add(new THREE.AmbientLight(0xff9fc8, 0.28));
+const luceLuna = new THREE.DirectionalLight(0xdcccff, 0.45);
+luceLuna.position.set(-13, 29, -86);
+scena.add(luceLuna);
+const luceRosa = new THREE.PointLight(0xff7fb0, 1.5, 16);
+luceRosa.position.set(2.2, 6, 3.2);
+scena.add(luceRosa);
+const luceViola = new THREE.PointLight(0xb07cff, 1.1, 16);
+luceViola.position.set(-3.4, 4.6, -2.2);
+scena.add(luceViola);
+const luceCalda = new THREE.PointLight(0xffc2a0, 0.7, 9);
+luceCalda.position.set(0.4, 1.4, 3.2);
+scena.add(luceCalda);
+
+/* ============================================================
+   7. TERRENO
+   ============================================================ */
+const suolo = new THREE.Mesh(new THREE.CircleGeometry(80, 48), new THREE.MeshLambertMaterial({ color: 0x24172f }));
+suolo.rotation.x = -Math.PI / 2;
+scena.add(suolo);
+
+const aloneSuolo = new THREE.Mesh(
+  new THREE.PlaneGeometry(1, 1),
+  new THREE.MeshBasicMaterial({ map: texMorbida, color: 0xff8fb8, transparent: true, opacity: 0.3, depthWrite: false, blending: THREE.AdditiveBlending })
+);
+aloneSuolo.rotation.x = -Math.PI / 2;
+aloneSuolo.position.y = 0.02;
+aloneSuolo.scale.set(13, 13, 1);
+scena.add(aloneSuolo);
+
+/* ============================================================
+   8. ALBERO DI CILIEGIO PROCEDURALE
+   ============================================================ */
+const albero = new THREE.Group();
+scena.add(albero);
+
+const rami = [];   // { inizio, dir, lung, raggio, fine }
+const punte = [];  // punti dove nascono i fiori
+
+/* Ruota "dir" di un angolo "incl" attorno a un azimut "az" */
+function devia(dir, incl, az) {
+  const ref = Math.abs(dir.y) < 0.99 ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(1, 0, 0);
+  const u = new THREE.Vector3().crossVectors(dir, ref).normalize();
+  const v = new THREE.Vector3().crossVectors(dir, u).normalize();
+  return dir.clone().multiplyScalar(Math.cos(incl))
+    .addScaledVector(u, Math.cos(az) * Math.sin(incl))
+    .addScaledVector(v, Math.sin(az) * Math.sin(incl))
+    .normalize();
+}
+
+/* Crescita ricorsiva: ogni ramo si divide in 2–3 rami più sottili */
+function cresci(inizio, dir, lung, raggio, liv) {
+  const fine = inizio.clone().addScaledVector(dir, lung);
+  rami.push({ inizio, dir, lung, raggio, fine });
+  if (liv >= Q.profondita) { punte.push({ p: fine, dir, terminale: true }); return; }
+  if (liv >= 3) punte.push({ p: fine, dir, terminale: false });
+
+  const n = liv === 0 ? 3 : (seme() < 0.55 ? 2 : 3);
+  const az0 = seme() * Math.PI * 2;
+  for (let i = 0; i < n; i++) {
+    const az = az0 + i * (Math.PI * 2 / n) + rs(-0.4, 0.4);
+    const incl = liv === 0 ? rs(0.5, 0.78) : rs(0.36, 0.7);
+    const nd = devia(dir, incl, az);
+    const fuori = new THREE.Vector3(fine.x, 0, fine.z);   // spinta verso l'esterno: chioma ampia
+    if (fuori.lengthSq() > 1e-4) nd.addScaledVector(fuori.normalize(), 0.2);
+    nd.y += liv < 3 ? 0.14 : -0.03;                        // i rami alti si allargano a ombrello
+    nd.normalize();
+    cresci(fine, nd, lung * rs(0.7, 0.84), raggio * 0.72 * rs(0.84, 0.98), liv + 1);
+  }
+}
+
+/* Tronco in due tratti leggermente inclinati, poi la chioma */
+{
+  const base = new THREE.Vector3(0, 0, 0);
+  const d0 = new THREE.Vector3(0.07, 1, 0.03).normalize();
+  const fine0 = base.clone().addScaledVector(d0, 1.05);
+  rami.push({ inizio: base, dir: d0, lung: 1.05, raggio: 0.38, fine: fine0 });
+  cresci(fine0, new THREE.Vector3(-0.05, 1, 0.02).normalize(), 1.25, 0.38 * 0.72, 0);
+}
+
+/* Rami: un solo InstancedMesh di cilindri rastremati (una chiamata di disegno) */
+const SU = new THREE.Vector3(0, 1, 0);
+const dummy = new THREE.Object3D();
+{
+  const geoRamo = new THREE.CylinderGeometry(0.72, 1, 1, Q.segmenti, 1, true);
+  geoRamo.translate(0, 0.5, 0);
+  const geoNodo = new THREE.SphereGeometry(1, Q.segmenti, 5);
+  const matCorteccia = new THREE.MeshLambertMaterial({ color: 0xffffff, emissive: 0x160a14 });
+  const meshRami = new THREE.InstancedMesh(geoRamo, matCorteccia, rami.length);
+  const meshNodi = new THREE.InstancedMesh(geoNodo, matCorteccia, rami.length);
+  const c = new THREE.Color();
+  rami.forEach((r, i) => {
+    dummy.position.copy(r.inizio);
+    dummy.quaternion.setFromUnitVectors(SU, r.dir);
+    dummy.scale.set(r.raggio, r.lung, r.raggio);
+    dummy.updateMatrix();
+    meshRami.setMatrixAt(i, dummy.matrix);
+    dummy.position.copy(r.fine);
+    dummy.quaternion.identity();
+    dummy.scale.setScalar(r.raggio * 0.72);
+    dummy.updateMatrix();
+    meshNodi.setMatrixAt(i, dummy.matrix);
+    c.setHex(0x4a2c3a).multiplyScalar(rs(0.8, 1.15));
+    meshRami.setColorAt(i, c);
+    meshNodi.setColorAt(i, c);
+  });
+  albero.add(meshRami, meshNodi);
+
+  // radici: il tronco si allarga dolcemente verso terra
+  const profilo = [[0.64, 0], [0.5, 0.06], [0.43, 0.16], [0.395, 0.3], [0.375, 0.48]].map(([x, y]) => new THREE.Vector2(x, y));
+  const radice = new THREE.Mesh(new THREE.LatheGeometry(profilo, 14), new THREE.MeshLambertMaterial({ color: 0x4a2c3a, emissive: 0x160a14 }));
+  albero.add(radice);
+}
+
+/* Misure della chioma (servono per inquadrare l'albero su ogni schermo) */
+const centroChioma = new THREE.Vector3();
+let alberoAlto = 0, alberoLargo = 0;
+punte.forEach(p => {
+  centroChioma.add(p.p);
+  alberoAlto = Math.max(alberoAlto, p.p.y);
+  alberoLargo = Math.max(alberoLargo, Math.hypot(p.p.x, p.p.z));
+});
+centroChioma.divideScalar(punte.length);
+alberoAlto += 0.5;
+alberoLargo += 0.5;
+const punteT = punte.filter(p => p.terminale);
+const punteI = punte.filter(p => !p.terminale);
+
+/* ---------- Fiori di ciliegio (5 petali con incisione, centro dorato) ---------- */
+function creaGeometriaFiore() {
+  const N = 40;
+  const pos = [], col = [], idx = [];
+  const cCentro = new THREE.Color(0xffd27a), cAnello = new THREE.Color(0xd23f78);
+  const cValle = new THREE.Color(0xf49abd), cBordo = new THREE.Color(0xfff0f5);
+  pos.push(0, 0, 0.03); col.push(cCentro.r, cCentro.g, cCentro.b);
+  for (let i = 0; i < N; i++) {                      // anello interno, rosa intenso
+    const th = i / N * Math.PI * 2;
+    pos.push(Math.cos(th) * 0.15, Math.sin(th) * 0.15, 0.01);
+    col.push(cAnello.r, cAnello.g, cAnello.b);
+  }
+  for (let i = 0; i < N; i++) {                      // bordo dei 5 petali
+    const th = i / N * Math.PI * 2;
+    const f = Math.abs(Math.cos(th * 2.5));
+    const r = 0.4 + 0.6 * Math.pow(f, 0.5) - 0.13 * Math.pow(f, 48);
+    pos.push(Math.cos(th) * r, Math.sin(th) * r, 0.3 * r * r);   // petali leggermente a coppa
+    const cc = cValle.clone().lerp(cBordo, Math.pow(f, 1.4));
+    col.push(cc.r, cc.g, cc.b);
+  }
+  for (let i = 0; i < N; i++) {
+    const a = 1 + i, b = 1 + (i + 1) % N, c = 1 + N + i, d = 1 + N + (i + 1) % N;
+    idx.push(0, a, b, a, c, d, a, d, b);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  g.setIndex(idx);
+  g.computeVertexNormals();
+  return g;
+}
+
+const nF = Q.fiori;
+const fiori = new THREE.InstancedMesh(
+  creaGeometriaFiore(),
+  new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide, emissive: 0x3c1228 }),
+  nF
+);
+fiori.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+const fPos = [], fQuat = [], fColAperto = [];
+const fPieno = new Float32Array(nF), fCur = new Float32Array(nF), fVel = new Float32Array(nF);
+const fTarget = new Float32Array(nF), fSoglia = new Float32Array(nF), fRitardo = new Float32Array(nF);
+const COLORE_BOCCIOLO = new THREE.Color(0xb8336a);
+const tinte = [0xffd9e6, 0xfff6f9, 0xffbfd4, 0xffe8f0, 0xffb0cb].map(h => new THREE.Color(h));
+{
+  const v = new THREE.Vector3(), n = new THREE.Vector3();
+  for (let i = 0; i < nF; i++) {
+    const usaT = seme() < 0.82;
+    const lista = usaT ? punteT : punteI;
+    const src = lista[(seme() * lista.length) | 0];
+    const raggio = usaT ? 0.5 : 0.3;
+    do { v.set(rs(-1, 1), rs(-1, 1), rs(-1, 1)); } while (v.lengthSq() > 1);
+    const p = src.p.clone().addScaledVector(v, raggio).addScaledVector(src.dir, rs(0, 0.2));
+    n.copy(p).sub(centroChioma).normalize().add(v.set(rs(-.6, .6), rs(-.3, .7), rs(-.6, .6))).normalize();
+    dummy.position.copy(p);
+    dummy.lookAt(p.x + n.x, p.y + n.y, p.z + n.z);   // il fiore "guarda" verso l'esterno
+    dummy.rotateZ(rs(0, Math.PI * 2));
+    fPos.push(p);
+    fQuat.push(dummy.quaternion.clone());
+    fPieno[i] = rs(0.13, 0.21);
+    fSoglia[i] = seme() * 0.999;
+    fColAperto.push(tinte[(seme() * tinte.length) | 0]);
+    dummy.scale.setScalar(0.0001);
+    dummy.updateMatrix();
+    fiori.setMatrixAt(i, dummy.matrix);
+    fiori.setColorAt(i, COLORE_BOCCIOLO);
+  }
+}
+albero.add(fiori);
+
+/* ---------- "Nuvole" rosa che riempiono la chioma ---------- */
+const matNuvole = new THREE.PointsMaterial({
+  size: 1.5, map: texMorbida, vertexColors: true, transparent: true, opacity: 0.0,
+  depthWrite: false, sizeAttenuation: true,
+});
+{
+  const n = Q.nuvole;
+  const pos = new Float32Array(n * 3), col = new Float32Array(n * 3);
+  const v = new THREE.Vector3(), c = new THREE.Color();
+  for (let i = 0; i < n; i++) {
+    const src = punteT[(seme() * punteT.length) | 0];
+    do { v.set(rs(-1, 1), rs(-1, 1), rs(-1, 1)); } while (v.lengthSq() > 1);
+    pos.set([src.p.x + v.x * 0.5, src.p.y + v.y * 0.4, src.p.z + v.z * 0.5], i * 3);
+    c.setHSL(rs(0.92, 0.97), rs(0.6, 0.9), rs(0.72, 0.86));
+    col.set([c.r, c.g, c.b], i * 3);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  albero.add(new THREE.Points(g, matNuvole));
+}
+
+/* ---------- Petali caduti sul prato ---------- */
+const suoloPetali = (() => {
+  const s = new THREE.Shape();
+  s.moveTo(0, 0);
+  s.bezierCurveTo(0.9, -0.2, 0.8, -1, 0.15, -1.05);
+  s.lineTo(0, -0.92);
+  s.lineTo(-0.15, -1.05);
+  s.bezierCurveTo(-0.8, -1, -0.9, -0.2, 0, 0);
+  const g = new THREE.ShapeGeometry(s, 5);
+  g.rotateX(-Math.PI / 2);
+  g.translate(0, 0, -0.5);
+  const m = new THREE.InstancedMesh(g, new THREE.MeshLambertMaterial({ color: 0xffffff, side: THREE.DoubleSide }), Q.suolo);
+  for (let i = 0; i < Q.suolo; i++) {
+    const r = Math.sqrt(seme()) * 6.2 + 0.4, a = seme() * Math.PI * 2;
+    dummy.position.set(Math.cos(a) * r, 0.03 + seme() * 0.02, Math.sin(a) * r);
+    dummy.rotation.set(rs(-0.25, 0.25), seme() * Math.PI * 2, rs(-0.25, 0.25));
+    dummy.scale.setScalar(rs(0.08, 0.14));
+    dummy.updateMatrix();
+    m.setMatrixAt(i, dummy.matrix);
+    m.setColorAt(i, tinte[(seme() * tinte.length) | 0].clone().lerp(COLORE_BOCCIOLO, 0.25).multiplyScalar(rs(0.5, 0.75)));
+  }
+  m.count = 0;
+  scena.add(m);
+  return m;
+})();
+
+/* ---------- Lucciole: punti di luce morbida che fluttuano ---------- */
+const lucciole = (() => {
+  const n = Q.lucciole;
+  const base = [], pos = new Float32Array(n * 3);
+  for (let i = 0; i < n; i++) {
+    base.push({
+      x: rand(-alberoLargo, alberoLargo), y: rand(0.6, alberoAlto), z: rand(-alberoLargo, alberoLargo) * 0.8,
+      f: rand(0, 6.28), v: rand(0.2, 0.5),
+    });
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3).setUsage(THREE.DynamicDrawUsage));
+  const pts = new THREE.Points(g, new THREE.PointsMaterial({
+    size: 0.26, map: texMorbida, color: 0xffd9a8, transparent: true, opacity: 0.9,
+    depthWrite: false, blending: THREE.AdditiveBlending, sizeAttenuation: true,
+  }));
+  pts.frustumCulled = false;
+  scena.add(pts);
+  return { base, pos, g };
+})();
+
+/* ============================================================
+   9. PARTICELLE DI PETALI (pool riutilizzabile, una chiamata di disegno)
+   ============================================================ */
+const MAXP = Q.petali;
+const pPos = new Float32Array(MAXP * 3), pVel = new Float32Array(MAXP * 3);
+const pRot = new Float32Array(MAXP), pVr = new Float32Array(MAXP), pFlip = new Float32Array(MAXP);
+const pFase = new Float32Array(MAXP), pFreq = new Float32Array(MAXP), pSize = new Float32Array(MAXP);
+const pAlpha = new Float32Array(MAXP), pVita = new Float32Array(MAXP), pVitaMax = new Float32Array(MAXP);
+const pAttrito = new Float32Array(MAXP);
+for (let i = 0; i < MAXP; i++) pPos[i * 3 + 1] = -999;
+
+const geoPetali = new THREE.BufferGeometry();
+const attrPos = new THREE.BufferAttribute(pPos, 3).setUsage(THREE.DynamicDrawUsage);
+const attrRot = new THREE.BufferAttribute(pRot, 1).setUsage(THREE.DynamicDrawUsage);
+const attrFlip = new THREE.BufferAttribute(pFlip, 1).setUsage(THREE.DynamicDrawUsage);
+const attrAlpha = new THREE.BufferAttribute(pAlpha, 1).setUsage(THREE.DynamicDrawUsage);
+const attrSize = new THREE.BufferAttribute(pSize, 1).setUsage(THREE.DynamicDrawUsage);
+geoPetali.setAttribute('position', attrPos);
+geoPetali.setAttribute('aRot', attrRot);
+geoPetali.setAttribute('aFlip', attrFlip);
+geoPetali.setAttribute('aAlpha', attrAlpha);
+geoPetali.setAttribute('aSize', attrSize);
+
+const matPetali = new THREE.ShaderMaterial({
+  transparent: true, depthWrite: false,
+  uniforms: { uTex: { value: texPetalo }, uScala: { value: 1 } },
+  vertexShader: `
+    attribute float aRot, aFlip, aAlpha, aSize;
+    uniform float uScala;
+    varying float vRot, vFlip, vAlpha;
+    void main() {
+      vec4 mv = modelViewMatrix * vec4(position, 1.0);
+      gl_Position = projectionMatrix * mv;
+      gl_PointSize = min(aSize * uScala / max(-mv.z, 0.1), 220.0);
+      vRot = aRot; vFlip = aFlip; vAlpha = aAlpha;
+    }`,
+  fragmentShader: `
+    uniform sampler2D uTex;
+    varying float vRot, vFlip, vAlpha;
+    void main() {
+      if (vAlpha < 0.01) discard;
+      vec2 p = gl_PointCoord - 0.5;
+      float c = cos(vRot), s = sin(vRot);
+      p = mat2(c, -s, s, c) * p;
+      p.x /= max(abs(vFlip), 0.18);   // il petalo "gira" su se stesso
+      p += 0.5;
+      if (p.x < 0.0 || p.x > 1.0 || p.y < 0.0 || p.y > 1.0) discard;
+      vec4 t = texture2D(uTex, p);
+      if (t.a < 0.04) discard;
+      gl_FragColor = vec4(t.rgb * (0.82 + 0.18 * abs(vFlip)), t.a * vAlpha);
+    }`,
+});
+const sistemaPetali = new THREE.Points(geoPetali, matPetali);
+sistemaPetali.frustumCulled = false;
+scena.add(sistemaPetali);
+
+let cursore = 0;
+function emetti(x, y, z, vx, vy, vz, size, vita, attrito) {
+  const i = cursore;
+  cursore = (cursore + 1) % MAXP;
+  const k = i * 3;
+  pPos[k] = x; pPos[k + 1] = y; pPos[k + 2] = z;
+  pVel[k] = vx; pVel[k + 1] = vy; pVel[k + 2] = vz;
+  pRot[i] = rand(0, 6.28); pVr[i] = rand(-2.5, 2.5);
+  pFase[i] = rand(0, 6.28); pFreq[i] = rand(1.4, 3.8);
+  pSize[i] = size; pVita[i] = vita; pVitaMax[i] = vita;
+  pAttrito[i] = attrito; pAlpha[i] = 0;
+  attrSize.needsUpdate = true;
+}
+
+/* Fontana di petali dal punto toccato */
+function esplosione(punto, n, forza = 1) {
+  for (let i = 0; i < n; i++) {
+    const th = rand(0, Math.PI * 2), u = rand(-0.25, 1);
+    const sx = Math.sqrt(1 - u * u);
+    const v = rand(1.6, 4.4) * forza;
+    emetti(punto.x, punto.y, punto.z,
+      Math.cos(th) * sx * v, u * v + 1.3, Math.sin(th) * sx * v,
+      rand(0.16, 0.3), rand(3.5, 6.5), rand(1.1, 1.7));
+  }
+}
+
+/* Un petalo che si stacca da un fiore aperto */
+const tmpV = new THREE.Vector3();
+function petaloDaFiore() {
+  for (let tentativi = 0; tentativi < 5; tentativi++) {
+    const j = (Math.random() * nF) | 0;
+    if (fTarget[j] >= fPieno[j] * 0.99 && fCur[j] > fPieno[j] * 0.8) {
+      albero.localToWorld(tmpV.copy(fPos[j]));
+      emetti(tmpV.x, tmpV.y, tmpV.z, rand(-0.2, 0.3), rand(-0.1, 0.1), rand(-0.2, 0.2),
+        rand(0.13, 0.22), rand(6, 10), 1.4);
+      return;
+    }
+  }
+}
+
+/* Tempesta: petali che attraversano tutto lo schermo vicino alla camera */
+const vTmp = new THREE.Vector3();
+function petaloTempesta() {
+  const d = rand(2.2, 13);
+  const mezzaH = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * d;
+  const mezzaW = mezzaH * camera.aspect;
+  tmpV.set(-mezzaW - rand(0.2, 1.4), rand(-mezzaH, mezzaH * 1.1), -d).applyMatrix4(camera.matrixWorld);
+  vTmp.set(rand(3.2, 6.5) * (0.6 + d / 13), rand(-1.1, 0.5), rand(-0.6, 0.6));
+  const vel = vTmp.length();
+  vTmp.transformDirection(camera.matrixWorld).multiplyScalar(vel);
+  emetti(tmpV.x, tmpV.y, tmpV.z, vTmp.x, vTmp.y, vTmp.z,
+    rand(0.12, 0.24), (2 * mezzaW + 3) / (vel * 0.7) + 0.5, 0.1);
+}
+
+function aggiornaPetali(dt, t) {
+  const vento = 0.5 + Math.sin(t * 0.3) * 0.35;
+  for (let i = 0; i < MAXP; i++) {
+    if (pVita[i] <= 0) continue;
+    pVita[i] -= dt;
+    if (pVita[i] <= 0) { pAlpha[i] = 0; pPos[i * 3 + 1] = -999; continue; }
+    const k = i * 3, f = pFase[i];
+    pVel[k]     += (vento * 0.6 + Math.sin(t * 1.7 + f) * 0.8) * dt;
+    pVel[k + 1] += (-0.9 + Math.cos(t * 2.3 + f) * 0.5) * dt;
+    pVel[k + 2] += Math.sin(t * 1.3 + f * 2) * 0.5 * dt;
+    const att = Math.exp(-dt * pAttrito[i]);
+    pVel[k] *= att; pVel[k + 1] *= att; pVel[k + 2] *= att;
+    pPos[k] += pVel[k] * dt; pPos[k + 1] += pVel[k + 1] * dt; pPos[k + 2] += pVel[k + 2] * dt;
+    if (pPos[k + 1] < 0.04) {                // si posa sul prato
+      pPos[k + 1] = 0.04; pVel[k] = pVel[k + 1] = pVel[k + 2] = 0;
+      pVr[i] = 0; pVita[i] = Math.min(pVita[i], 1.2);
+    }
+    pRot[i] += pVr[i] * dt;
+    pFlip[i] = Math.cos(t * pFreq[i] + f);
+    const eta = pVitaMax[i] - pVita[i];
+    pAlpha[i] = Math.min(1, eta / 0.25, pVita[i] / 1.0);
+  }
+  attrPos.needsUpdate = attrRot.needsUpdate = attrFlip.needsUpdate = attrAlpha.needsUpdate = true;
+}
+
+/* ============================================================
+   10. FIORITURA (molla con piccolo rimbalzo: i fiori "sbocciano")
+   ============================================================ */
+const fioritura = { livello: IMPOSTAZIONI.fiorituraIniziale };
+let tempo = 0;
+
+function impostaFioritura(L, ritardoMax = 0.9, ritardoMin = 0) {
+  fioritura.livello = L;
+  for (let i = 0; i < nF; i++) {
+    const t = (fSoglia[i] < L ? 1 : 0.3) * fPieno[i];
+    if (t !== fTarget[i]) {
+      fTarget[i] = t;
+      fRitardo[i] = tempo + rand(ritardoMin, ritardoMax);
+    }
+  }
+  suoloPetali.count = Math.floor(Q.suolo * (0.2 + 0.8 * L));
+  gsap.to(matNuvole, { opacity: 0.05 + 0.24 * L, duration: 1.6, ease: 'sine.out' });
+}
+
+const colTmp = new THREE.Color();
+function aggiornaFiori(dt) {
+  let cambiati = false;
+  const att = Math.exp(-dt * 9);
+  for (let i = 0; i < nF; i++) {
+    if (tempo < fRitardo[i]) continue;
+    const diff = fTarget[i] - fCur[i];
+    if (Math.abs(diff) < 1e-4 && Math.abs(fVel[i]) < 1e-4) continue;
+    fVel[i] = (fVel[i] + diff * 70 * dt) * att;
+    fCur[i] += fVel[i] * dt;
+    dummy.position.copy(fPos[i]);
+    dummy.quaternion.copy(fQuat[i]);
+    dummy.scale.setScalar(Math.max(0.0001, fCur[i]));
+    dummy.updateMatrix();
+    fiori.setMatrixAt(i, dummy.matrix);
+    const apertura = clamp((fCur[i] / fPieno[i] - 0.3) / 0.7);
+    fiori.setColorAt(i, colTmp.copy(COLORE_BOCCIOLO).lerp(fColAperto[i], apertura));
+    cambiati = true;
+  }
+  if (cambiati) {
+    fiori.instanceMatrix.needsUpdate = true;
+    fiori.instanceColor.needsUpdate = true;
+  }
+}
+
+/* ============================================================
+   11. CAMERA E INQUADRATURA RESPONSIVE
+   ============================================================ */
+const orbita = { ang: -0.4, k: 1.4, alza: 0, dh: -1.4 };  // posizione iniziale (si avvicina in apertura)
+const inq = { dist: 15, ty: 3, h: 3.5, tyChioma: 4, hChioma: 4.5 };
+let derivaLenta = 0;
+
+function adatta() {
+  const w = innerWidth, h = innerHeight;
+  camera.aspect = w / h;
+  const tanV = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+  const verticale = (alberoAlto * 0.5 * (camera.aspect < 1 ? 1.16 : 1.32)) / tanV;
+  const orizzontale = (alberoLargo * (camera.aspect < 1 ? 0.7 : 1.08)) / (tanV * camera.aspect);
+  inq.dist = Math.max(verticale, orizzontale);
+  inq.ty = alberoAlto * (camera.aspect < 1 ? 0.4 : 0.47);  // in verticale l'albero sale, lasciando spazio all'anello
+  inq.h = inq.ty + 0.5;
+  inq.tyChioma = centroChioma.y + 0.5;   // finale: da sotto la chioma, guardando i fiori
+  inq.hChioma = centroChioma.y - 0.7;
+  camera.updateProjectionMatrix();
+  renderer.setSize(w, h);
+  matPetali.uniforms.uScala.value = renderer.domElement.height / (2 * tanV);
+  matStelle.uniforms.uPR.value = renderer.getPixelRatio();
+}
+
+function aggiornaCamera() {
+  const a = orbita.ang + Math.sin(tempo * 0.13) * 0.07 + derivaLenta;
+  const r = inq.dist * orbita.k;
+  const ty = THREE.MathUtils.lerp(inq.ty, inq.tyChioma, orbita.alza);
+  const h = THREE.MathUtils.lerp(inq.h, inq.hChioma, orbita.alza) + orbita.dh + Math.sin(tempo * 0.21) * 0.08;
+  camera.position.set(Math.sin(a) * r, h, Math.cos(a) * r);
+  camera.lookAt(0, ty, 0);
+}
+
+addEventListener('resize', adatta);
+addEventListener('orientationchange', () => setTimeout(adatta, 250));
+if (window.visualViewport) visualViewport.addEventListener('resize', adatta);
+adatta();
+aggiornaCamera();
+
+/* ============================================================
+   12. INTERFACCIA: frasi, anello di progresso, onda del tocco
+   ============================================================ */
+const elRicordo = $('#ricordo');
+let twRicordo = null;
+function mostraFrase(testo, tenuta = 2.2) {
+  if (twRicordo) twRicordo.kill();
+  elRicordo.textContent = testo;
+  twRicordo = gsap.timeline()
+    .fromTo(elRicordo, { autoAlpha: 0, y: 14, letterSpacing: '0.07em' },
+      { autoAlpha: 1, y: 0, letterSpacing: '0.01em', duration: 1.1, ease: 'power3.out' })
+    .to(elRicordo, { autoAlpha: 0, y: -10, duration: 1.2, ease: 'power2.in' }, '+=' + tenuta);
+}
+
+const CIRC = 2 * Math.PI * 28;
+const elLuce = $('.anello .luce'), elPerc = $('.anello .perc');
+elLuce.style.strokeDasharray = CIRC;
+elLuce.style.strokeDashoffset = CIRC;
+const perc = { v: 0 };
+let progressoVisibile = false;
+function mostraProgresso() {
+  if (progressoVisibile) return;
+  progressoVisibile = true;
+  gsap.to('#progresso', { autoAlpha: 1, duration: 1.6, ease: 'power2.out' });
+}
+function aggiornaProgresso(p) {
+  elLuce.style.strokeDashoffset = CIRC * (1 - p);
+  gsap.to(perc, { v: p * 100, duration: 1.1, ease: 'power2.out', onUpdate: () => { elPerc.textContent = Math.round(perc.v) + '%'; } });
+  gsap.fromTo('.anello', { scale: 1.14 }, { scale: 1, duration: 0.9, ease: 'elastic.out(1, 0.5)' });
+}
+
+function onda(x, y) {
+  const d = document.createElement('div');
+  d.className = 'onda';
+  d.style.left = x + 'px';
+  d.style.top = y + 'px';
+  document.body.appendChild(d);
+  setTimeout(() => d.remove(), 1000);
+}
+
+/* ============================================================
+   13. TOCCO: petali dal dito, l'albero trema e fiorisce
+   ============================================================ */
+const raycaster = new THREE.Raycaster();
+const ndc = new THREE.Vector2();
+const piano = new THREE.Plane();
+const puntoPiano = new THREE.Vector3(), normalePiano = new THREE.Vector3();
+function puntoNelMondo(x, y) {
+  ndc.set(x / innerWidth * 2 - 1, -(y / innerHeight) * 2 + 1);
+  raycaster.setFromCamera(ndc, camera);
+  camera.getWorldDirection(normalePiano).negate();
+  puntoPiano.copy(centroChioma).addScaledVector(normalePiano, 1.5);   // poco davanti alla chioma
+  piano.setFromNormalAndCoplanarPoint(normalePiano, puntoPiano);
+  const out = new THREE.Vector3();
+  return raycaster.ray.intersectPlane(piano, out) ? out : out.copy(centroChioma);
+}
+
+let tocchi = 0, ultimoTocco = 0, stato = 'gioco', scossa = 0;
+const L0 = IMPOSTAZIONI.fiorituraIniziale, N = IMPOSTAZIONI.tocchiNecessari;
+
+function alTocco(x, y) {
+  esplosione(puntoNelMondo(x, y), isMobile ? 26 : 38);
+  onda(x, y);
+  scossa = 1;
+  gsap.fromTo(luceRosa, { intensity: 2.8 }, { intensity: stato === 'gioco' ? 1.5 : 2.4, duration: 1.3, ease: 'power2.out' });
+
+  if (stato !== 'gioco') return;
+  const ora = performance.now();
+  if (ora - ultimoTocco < 180) return;      // evita doppi conteggi con più dita
+  ultimoTocco = ora;
+
+  mostraProgresso();
+  tocchi++;
+  if (navigator.vibrate) navigator.vibrate(12);
+  const p = Math.min(1, tocchi / N);
+  impostaFioritura(L0 + (1 - L0) * p);
+  aggiornaProgresso(p);
+  mostraFrase(TESTI.ricordi[(tocchi - 1) % TESTI.ricordi.length], 1.6);
+  if (tocchi >= N) {
+    stato = 'climax';
+    setTimeout(climax, 1300);
+  }
+}
+
+function suPuntatore(e) {
+  if (e.target.closest && e.target.closest('.card')) return;
+  alTocco(e.clientX, e.clientY);
+}
+if (window.PointerEvent) {
+  addEventListener('pointerdown', suPuntatore, { passive: true });
+} else {
+  addEventListener('touchstart', e => {
+    if (e.target.closest && e.target.closest('.card')) return;
+    for (const t of e.changedTouches) alTocco(t.clientX, t.clientY);
+  }, { passive: true });
+  addEventListener('mousedown', suPuntatore);
+}
+document.addEventListener('touchmove', e => e.preventDefault(), { passive: false });
+document.addEventListener('gesturestart', e => e.preventDefault());
+document.addEventListener('dblclick', e => e.preventDefault());
+
+/* ============================================================
+   14. IL CLIMAX: camera cinematografica, tempesta, card
+   ============================================================ */
+let tempesta = 0, accTempesta = 0;
+
+function climax() {
+  const durata = riduciMovimento ? 2.5 : 6.2;
+  gsap.timeline()
+    .to('#progresso', { autoAlpha: 0, y: 14, duration: 1.4, ease: 'power2.out' }, 0)
+    .to(elRicordo, { autoAlpha: 0, duration: 0.9 }, 0.2)
+    // la camera si ferma appena fuori dalla chioma, che così riempie lo schermo
+    .to(orbita, { ang: orbita.ang + Math.PI * 0.42, k: (alberoLargo * 1.15 + 0.8) / inq.dist, alza: 1, duration: durata, ease: 'power2.inOut' }, 0.3)
+    .add(() => { tempesta = riduciMovimento ? 1.5 : 5; }, 0.9)
+    .to(luceRosa, { intensity: 2.4, duration: 3, ease: 'sine.inOut' }, 0.9)
+    .to(luceViola, { intensity: 1.6, duration: 3, ease: 'sine.inOut' }, 0.9)
+    .add(mostraCard, riduciMovimento ? 2.6 : 5.2);
+}
+
+function mostraCard() {
+  stato = 'proposta';
+  const card = $('.card');
+  gsap.fromTo(card,
+    { autoAlpha: 0, y: 50, scale: 0.92, rotationX: 10, transformPerspective: 900 },
+    { autoAlpha: 1, y: 0, scale: 1, rotationX: 0, duration: 1.9, ease: 'expo.out' });
+  gsap.fromTo('.fase-domanda .riga',
+    { autoAlpha: 0, y: 18 },
+    { autoAlpha: 1, y: 0, duration: 1.2, stagger: 0.38, delay: 0.45, ease: 'power3.out' });
+}
+
+/* ============================================================
+   15. "SÌ, PER SEMPRE"
+   ============================================================ */
+const sparo = window.confetti ? confetti.create($('#confetti'), { resize: true, useWorker: true }) : null;
+const COLORI_FESTA = ['#ffc0d6', '#ff8fb3', '#ffffff', '#f7a8c8', '#ffd6e5', '#e85d8f', '#ffd27a'];
+
+function festa() {
+  if (!sparo) return;
+  const forme = [];
+  if (confetti.shapeFromPath) {
+    forme.push(confetti.shapeFromPath({ path: 'M0 0C9 -2 8 -10 1.5 -10.5L0 -9.2L-1.5 -10.5C-8 -10 -9 -2 0 0Z' }));
+    forme.push(confetti.shapeFromPath({ path: 'M167 72c19,-38 37,-56 75,-56 42,0 76,33 76,75 0,76 -76,151 -151,227 -76,-76 -151,-151 -151,-227 0,-42 33,-75 75,-75 38,0 57,18 76,56z' }));
+  }
+  forme.push('circle');
+  const tanti = isMobile ? 1 : 1.5;
+  sparo({ particleCount: Math.round(130 * tanti), spread: 100, startVelocity: 48, origin: { y: 0.62 }, colors: COLORI_FESTA, shapes: forme, scalar: 1.25, ticks: 280 });
+  const fine = performance.now() + 3400;
+  (function cannoni() {
+    sparo({ particleCount: 3, angle: 60, spread: 55, origin: { x: 0, y: 0.8 }, colors: COLORI_FESTA, shapes: forme, scalar: 1.1 });
+    sparo({ particleCount: 3, angle: 120, spread: 55, origin: { x: 1, y: 0.8 }, colors: COLORI_FESTA, shapes: forme, scalar: 1.1 });
+    if (performance.now() < fine) requestAnimationFrame(cannoni);
+  })();
+  setTimeout(() => sparo({
+    particleCount: Math.round(70 * tanti), spread: 170, startVelocity: 30, origin: { y: 0.35 }, gravity: 0.6,
+    colors: ['#ff8fb3', '#ff5c8a', '#ffc0d6'], shapes: forme.length > 2 ? [forme[1]] : forme, scalar: 1.7, ticks: 320,
+  }), 900);
+}
+
+$('#si').addEventListener('click', () => {
+  if (stato !== 'proposta') return;
+  stato = 'si';
+  if (navigator.vibrate) navigator.vibrate([40, 60, 40, 60, 140]);
+  festa();
+  esplosione(albero.localToWorld(centroChioma.clone()), isMobile ? 150 : 260, 1.4);
+  tempesta = riduciMovimento ? 1.5 : 3.5;
+  gsap.to(luceRosa, { intensity: 3.4, duration: 0.5, yoyo: true, repeat: 1, ease: 'sine.inOut' });
+  gsap.timeline()
+    .to('.fase-domanda', { autoAlpha: 0, y: -14, duration: 0.6, ease: 'power2.in' })
+    .add(() => { $('.fase-domanda').hidden = true; $('.fase-finale').hidden = false; })
+    .fromTo('.fase-finale > *', { autoAlpha: 0, y: 22, scale: 0.94 },
+      { autoAlpha: 1, y: 0, scale: 1, duration: 1.1, stagger: 0.28, ease: 'back.out(1.6)' });
+});
+
+/* Il bottone "No" scappa in un punto a caso della card a ogni tocco
+   (senza mai finire sopra il "Sì") e dopo l'ultima fuga sparisce. */
+let fugheNo = 0;
+$('#no').addEventListener('click', () => {
+  if (stato !== 'proposta') return;
+  const no = $('#no');
+  fugheNo++;
+  if (navigator.vibrate) navigator.vibrate(25);
+  const frase = TESTI.frasiNo[Math.min(fugheNo, TESTI.frasiNo.length) - 1];
+  if (frase) no.textContent = frase;
+
+  if (fugheNo >= IMPOSTAZIONI.fugheNo) {
+    no.disabled = true;
+    gsap.to(no, {
+      scale: 0, rotation: 200, autoAlpha: 0, duration: 0.55, ease: 'back.in(2)',
+      onComplete: () => { no.style.pointerEvents = 'none'; },   // resta il suo spazio: la card non salta
+    });
+    return;
+  }
+
+  const rc = $('.card').getBoundingClientRect();
+  const rn = no.getBoundingClientRect();
+  const rs = $('#si').getBoundingClientRect();
+  const x0 = gsap.getProperty(no, 'x'), y0 = gsap.getProperty(no, 'y');
+  const baseX = rn.left - x0, baseY = rn.top - y0;       // posizione originale nel layout
+  const m = 14;                                           // margine dal bordo della card
+  let dx = x0, dy = y0;
+  for (let i = 0; i < 40; i++) {
+    const L = rc.left + m + Math.random() * Math.max(0, rc.width - rn.width - 2 * m);
+    const T = rc.top + m + Math.random() * Math.max(0, rc.height - rn.height - 2 * m);
+    const sopraSi = L < rs.right + 8 && L + rn.width > rs.left - 8 && T < rs.bottom + 8 && T + rn.height > rs.top - 8;
+    const troppoVicino = Math.hypot(L - rn.left, T - rn.top) < 70;
+    dx = L - baseX; dy = T - baseY;
+    if (!sopraSi && !troppoVicino) break;
+  }
+  gsap.to(no, { x: dx, y: dy, rotation: (Math.random() - 0.5) * 24, duration: 0.42, ease: 'back.out(1.8)' });
+});
+
+/* ============================================================
+   16. CICLO DI ANIMAZIONE (requestAnimationFrame)
+   ============================================================ */
+let ultimo = performance.now(), accPetali = 0, primoFrame = true;
+const posLucciole = lucciole.pos;
+
+function ciclo(ora) {
+  requestAnimationFrame(ciclo);
+  if (document.hidden) { ultimo = ora; return; }       // in background: risparmia batteria
+  const dt = Math.min(0.05, (ora - ultimo) / 1000 || 0);
+  ultimo = ora;
+  tempo += dt;
+
+  // l'albero ondeggia al vento e trema quando viene toccato
+  scossa *= Math.exp(-dt * 3);
+  albero.rotation.z = Math.sin(tempo * 0.6) * 0.012 + scossa * 0.024 * Math.sin(tempo * 17);
+  albero.rotation.x = Math.sin(tempo * 0.45 + 1) * 0.008 + scossa * 0.012 * Math.sin(tempo * 13);
+
+  aggiornaFiori(dt);
+
+  // petali che cadono da soli (più fiori aperti = più petali)
+  const ritmo = stato === 'si' ? 26 : 2 + 12 * fioritura.livello;
+  accPetali += ritmo * dt;
+  while (accPetali >= 1) { petaloDaFiore(); accPetali--; }
+
+  if (tempesta > 0) {
+    tempesta -= dt;
+    accTempesta += dt * (isMobile ? 95 : 160);
+    while (accTempesta >= 1) { petaloTempesta(); accTempesta--; }
+  }
+  aggiornaPetali(dt, tempo);
+
+  // lucciole
+  for (let i = 0; i < lucciole.base.length; i++) {
+    const b = lucciole.base[i];
+    posLucciole[i * 3]     = b.x + Math.sin(tempo * b.v + b.f) * 0.8;
+    posLucciole[i * 3 + 1] = b.y + Math.sin(tempo * b.v * 1.3 + b.f * 2) * 0.5;
+    posLucciole[i * 3 + 2] = b.z + Math.cos(tempo * b.v * 0.9 + b.f) * 0.8;
+  }
+  lucciole.g.attributes.position.needsUpdate = true;
+
+  if (stato === 'proposta' || stato === 'si') derivaLenta += dt * 0.035;  // lenta rotazione finale
+  matStelle.uniforms.uTempo.value = tempo;
+  aggiornaCamera();
+  renderer.render(scena, camera);
+
+  if (primoFrame) {
+    primoFrame = false;
+    $('#velo').classList.add('via');
+  }
+}
+
+/* ============================================================
+   17. AVVIO: apertura cinematografica
+   ============================================================ */
+impostaFioritura(L0, 3.6, 0.8);                    // i primi fiori sbocciano mentre la scena appare
+gsap.to(orbita, { ang: 0, k: 1, dh: 0, duration: riduciMovimento ? 0.1 : 5.5, ease: 'power3.out' });
+setTimeout(() => { if (tocchi === 0) mostraFrase(TESTI.apertura, 2.4); }, 1300);
+setTimeout(mostraProgresso, 4600);
+requestAnimationFrame(ciclo);
+
+})();
+</script>
+</body>
+</html>
