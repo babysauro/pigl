@@ -41,7 +41,7 @@
 
   /* Frase poetica (apertura e "ricordi" a ogni tocco) */
   #ricordo {
-    position: fixed; left: 50%; top: calc(11vh + var(--safe-t)); transform: translateX(-50%);
+    position: fixed; left: 50%; top: calc(5vh + var(--safe-t)); transform: translateX(-50%);
     width: min(86vw, 480px); text-align: center; z-index: 10; pointer-events: none;
     font-family: 'Cormorant Garamond', Georgia, serif; font-style: italic; font-weight: 500;
     font-size: clamp(23px, 6.6vw, 34px); line-height: 1.22; color: #fff;
@@ -974,10 +974,16 @@ function adatta() {
   const w = innerWidth, h = innerHeight;
   camera.aspect = w / h;
   const tanV = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
-  const verticale = (alberoAlto * 0.5 * (camera.aspect < 1 ? 1.16 : 1.32)) / tanV;
+  // Fascia di cielo libera in alto, riservata alle frasi (#ricordo): fino a 2 righe + margine
+  const stileRicordo = getComputedStyle(document.getElementById('ricordo'));
+  const altoRiservato = parseFloat(stileRicordo.top) + 2 * parseFloat(stileRicordo.lineHeight) + 18;
+  const fAlto = Math.min(0.34, altoRiservato / h);         // quota di schermo sopra la chioma
+  const fBasso = 0.14;                                     // quota di schermo sotto il terreno (anello)
+  const halfNecessaria = (alberoAlto * 1.08) / (2 * (1 - fAlto - fBasso)); // 1.08: margine prospettico
+  const verticale = halfNecessaria / tanV;
   const orizzontale = (alberoLargo * (camera.aspect < 1 ? 0.7 : 1.08)) / (tanV * camera.aspect);
   inq.dist = Math.max(verticale, orizzontale);
-  inq.ty = alberoAlto * (camera.aspect < 1 ? 0.4 : 0.47);  // in verticale l'albero sale, lasciando spazio all'anello
+  inq.ty = inq.dist * tanV * (1 - 2 * fBasso);             // il terreno resta a fBasso dal fondo
   inq.h = inq.ty + 0.5;
   inq.tyChioma = centroChioma.y + 0.5;   // finale: da sotto la chioma, guardando i fiori
   inq.hChioma = centroChioma.y - 0.7;
