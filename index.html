@@ -508,7 +508,7 @@ const matStelle = new THREE.ShaderMaterial({
 }
 
 const luna = new THREE.Sprite(new THREE.SpriteMaterial({ map: textureLuna(), fog: false, depthWrite: false, transparent: true }));
-luna.position.set(-13, 29, -86);
+luna.position.set(-13, 18, -86);   // più bassa: resta sotto la fascia delle frasi
 luna.scale.set(30, 30, 1);
 luna.renderOrder = -1;
 scena.add(luna);
@@ -974,17 +974,53 @@ function adatta() {
   const w = innerWidth, h = innerHeight;
   camera.aspect = w / h;
   const tanV = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
-  // Fascia di cielo libera in alto, riservata alle frasi (#ricordo): fino a 2 righe + margine
-  const stileRicordo = getComputedStyle(document.getElementById('ricordo'));
-  const altoRiservato = parseFloat(stileRicordo.top) + 2 * parseFloat(stileRicordo.lineHeight) + 18;
-  const fAlto = Math.min(0.34, altoRiservato / h);         // quota di schermo sopra la chioma
+  // Fascia di cielo libera in alto, riservata alle frasi (#ricordo): misura la frase più alta
+  const elR = document.getElementById('ricordo');
+  const testoPrima = elR.textContent;
+  let altezzaFrase = 0;
+  [TESTI.apertura, ...TESTI.ricordi].forEach(t => {
+    elR.textContent = t;
+    altezzaFrase = Math.max(altezzaFrase, elR.offsetHeight);
+  });
+  elR.textContent = testoPrima;
+  const altoRiservato = elR.offsetTop + altezzaFrase + 24;  // + margine fra testo e rami
+  const fAlto = Math.min(0.4, altoRiservato / h);          // quota di schermo riservata al testo
   const fBasso = 0.14;                                     // quota di schermo sotto il terreno (anello)
-  const halfNecessaria = (alberoAlto * 1.08) / (2 * (1 - fAlto - fBasso)); // 1.08: margine prospettico
+  const halfNecessaria = (alberoAlto * 1.08) / (2 * (1 - fAlto - fBasso));
   const verticale = halfNecessaria / tanV;
   const orizzontale = (alberoLargo * (camera.aspect < 1 ? 0.7 : 1.08)) / (tanV * camera.aspect);
   inq.dist = Math.max(verticale, orizzontale);
   inq.ty = inq.dist * tanV * (1 - 2 * fBasso);             // il terreno resta a fBasso dal fondo
   inq.h = inq.ty + 0.5;
+  camera.updateProjectionMatrix();
+
+  // Verifica reale: proietta i fiori sullo schermo dalle varie posizioni della camera
+  // (apertura, inquadratura normale, tutto intorno all'albero) e allontana la camera
+  // finché nessun fiore entra nella fascia del testo.
+  const limiteNdc = 1 - 2 * fAlto;
+  const pose = [{ k: 1.4, dh: -1.4 }, { k: 1.15, dh: -0.6 }, { k: 1, dh: 0 }];
+  const v = new THREE.Vector3();
+  const cimaChioma = () => {
+    let max = -Infinity;
+    for (const pz of pose) {
+      for (let i = 0; i < 12; i++) {
+        const a = (i / 12) * Math.PI * 2, r = inq.dist * pz.k;
+        camera.position.set(Math.sin(a) * r, inq.h + pz.dh + 0.08, Math.cos(a) * r);
+        camera.lookAt(0, inq.ty, 0);
+        camera.updateMatrixWorld();
+        for (const p of punte) {
+          v.set(p.p.x, p.p.y + 0.6, p.p.z).project(camera);   // +0.6: ingombro dei fiori
+          if (v.y > max) max = v.y;
+        }
+      }
+    }
+    return max;
+  };
+  for (let n = 0; n < 30 && cimaChioma() > limiteNdc; n++) {
+    inq.dist *= 1.03;
+    inq.ty = inq.dist * tanV * (1 - 2 * fBasso);
+    inq.h = inq.ty + 0.5;
+  }
   inq.tyChioma = centroChioma.y + 0.5;   // finale: da sotto la chioma, guardando i fiori
   inq.hChioma = centroChioma.y - 0.7;
   camera.updateProjectionMatrix();
@@ -1007,6 +1043,7 @@ addEventListener('orientationchange', () => setTimeout(adatta, 250));
 if (window.visualViewport) visualViewport.addEventListener('resize', adatta);
 adatta();
 aggiornaCamera();
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(adatta);  // il font cambia l'altezza del testo
 
 /* ============================================================
    12. INTERFACCIA: frasi, anello di progresso, onda del tocco
